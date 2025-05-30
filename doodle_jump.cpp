@@ -86,9 +86,30 @@ void generateNewPlatformsIfNeeded()
         Platform p;
         p.x = (double)(rand() % 180 - 90) / 100.0;
         p.y = platforms.empty() ? cameraY + 0.5 : platforms.back().y + 0.25 + (rand() % 50) / 300.0;
-        
+
         platforms.push_back(p);
     }
+}
+
+void drawGameOver()
+{
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(-1.0, 1.0, -1.5, 1.5);
+    glMatrixMode(GL_MODELVIEW);
+    glColor3d(1.0, 0.0, 0.0);
+
+    glBegin(GL_QUADS);
+        glVertex2d(-0.5, -0.2);
+        glVertex2d(0.5, -0.2);
+        glVertex2d(0.5, 0.2);
+        glVertex2d(-0.5, 0.2);
+    glEnd();
+
+    glColor3d(1.0, 1.0, 1.0);
+    glRasterPos2d(-0.4, -0.05);
+    std::string text = "Game over! Press R to restart";
+    for(char c : text) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, c);
 }
 
 void init()
@@ -110,7 +131,7 @@ void display()
     gluOrtho2D(-1.0, 1.0, cameraY - 1.5, cameraY + 1.5);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    if(gameOver) exit(0);
+    if(gameOver) drawGameOver();
     else
     {
         glColor3d(1.0, 1.0, 1.0);
@@ -122,6 +143,12 @@ void display()
 
 void update(int value)
 {
+    if(gameOver)
+    {
+        glutPostRedisplay();
+        return;
+    } 
+
     velocity += gravity;
     if(velocity < MaxFallSpeed) velocity = MaxFallSpeed;
     playerY += velocity;
@@ -152,8 +179,30 @@ void update(int value)
     glutTimerFunc(16, update, 0);
 }
 
+void restartGame()
+{
+    gameOver = false;
+    playerX = 0.0;
+    playerY = 0.0;
+    velocity = 0.0;
+    cameraY = -0.5;
+    platforms.clear();
+    generatePlatforms();
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(-1.0, 1.0, -1.5, 1.5);
+    glMatrixMode(GL_MODELVIEW);
+    glutPostRedisplay();
+    glutTimerFunc(16, update, 0);
+}
+
 void keyboard(unsigned char key, int x, int y)
 {
+    if(gameOver && (key == 'r' || key == 'R'))
+    {
+        restartGame();
+    }
     if(key == 27)
     {
         exit(0);
