@@ -17,21 +17,33 @@ bool gameOver = false;
 
 struct Platform
 {
+    int type = 1;
     double x, y;
     double width = 0.3;
     double height = 0.05;
+    double speed = 0.0;
+    double moveRange = 0.0;
+    double startX;
 };
 
 std::vector<Platform> platforms;
 
 void generatePlatforms()
 {
-    platforms.push_back({0.0, -0.5});
+    platforms.push_back({1, 0.0, -0.5});
     for(int i = 0; i < 10; ++i)
     {
         Platform p;
+        p.type = (rand() % 5 == 0) ? 2 : 1;
         p.x = (double)(rand() % 180 - 90) / 100.0;
         p.y = (double)i * 0.25;
+
+        if(p.type == 2)
+        {
+            p.speed = (rand() % 50 + 20) / 7500.0;
+            p.moveRange = (rand() % 50 + 30) / 100.0;
+            p.startX = p.x;
+        }
 
         if(i > 0) p.y += (rand() % 50) / 250.0;
         platforms.push_back(p);
@@ -55,7 +67,14 @@ void drawPlatforms()
     {
         if(p.y >= cameraY - 2.0 && p.y <= cameraY + 2.0)
         {
-            glColor3d(0.0, 1.0, 0.0);
+            if(p.type == 2)
+            {
+                glColor3d(0.0, 0.5, 1.0);
+            }
+            else
+            {
+                glColor3d(0.0, 1.0, 0.0);
+            }
 
             glBegin(GL_QUADS);
                 glVertex2d(p.x - p.width / 2, p.y - p.height / 2);
@@ -84,9 +103,15 @@ void generateNewPlatformsIfNeeded()
     while(platforms.empty() || platforms.back().y < cameraY + 2.5)
     {
         Platform p;
+        p.type = (rand() % 5 == 0) ? 2 : 1;
         p.x = (double)(rand() % 180 - 90) / 100.0;
         p.y = platforms.empty() ? cameraY + 0.5 : platforms.back().y + 0.25 + (rand() % 50) / 300.0;
-
+        if(p.type == 2)
+        {
+            p.speed = (rand() % 50 + 20) / 7500.0;
+            p.moveRange = (rand() % 50 + 30) / 100.0;
+            p.startX = p.x;
+        }
         platforms.push_back(p);
     }
 }
@@ -148,6 +173,18 @@ void update(int value)
         glutPostRedisplay();
         return;
     } 
+
+    for(auto& p : platforms)
+    {
+        if(p.type == 2)
+        {
+            p.x += p.speed;
+            if(fabs(p.x - p.startX) > p.moveRange) 
+            {
+                p.speed *= -1;
+            }
+        }
+    }
 
     velocity += gravity;
     if(velocity < MaxFallSpeed) velocity = MaxFallSpeed;
