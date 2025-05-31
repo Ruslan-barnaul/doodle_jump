@@ -26,7 +26,16 @@ struct Platform
     double startX;
 };
 
+struct Enemy
+{
+    double x, y;
+    double width = 0.2;
+    double height = 0.3;
+    bool alive = true;
+};
+
 std::vector<Platform> platforms;
+std::vector<Enemy> enemies;
 
 void generatePlatforms()
 {
@@ -86,6 +95,23 @@ void drawPlatforms()
     }
 }
 
+void drawEnemies()
+{
+    glColor3d(1.0, 0.0, 0.0);
+    for(const auto& e : enemies) 
+    {
+        if(e.alive && e.y >= cameraY - 2.0 && e.y <= cameraY + 2.0) 
+        {
+            glBegin(GL_QUADS);
+                glVertex2d(e.x - e.width/2, e.y - e.height/2);
+                glVertex2d(e.x + e.width/2, e.y - e.height/2);
+                glVertex2d(e.x + e.width/2, e.y + e.height/2);
+                glVertex2d(e.x - e.width/2, e.y + e.height/2);
+            glEnd();
+        }
+    }
+}
+
 bool checkCollision(double px, double py, const Platform& p)
 {
     return 
@@ -97,22 +123,43 @@ bool checkCollision(double px, double py, const Platform& p)
             
 }
 
+bool checkEnemyCollision(double px, double py, const Enemy& e) 
+{
+    return 
+        (px + 0.1 > e.x - e.width/2) &&
+        (px - 0.1 < e.x + e.width/2) &&
+        (py - 0.1 <= e.y + e.height/2) &&
+        (py - 0.1 >= e.y - e.height/2) &&
+        (velocity <= 0);
+}
+
 void generateNewPlatformsIfNeeded()
 {
     platforms.erase(std::remove_if(platforms.begin(), platforms.end(), [](const Platform& p) {return p.y < cameraY - 2.0;}), platforms.end());
+    enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [](const Enemy& e) { return e.y < cameraY - 2.0; }), enemies.end());
     while(platforms.empty() || platforms.back().y < cameraY + 2.5)
     {
-        Platform p;
-        p.type = (rand() % 5 == 0) ? 2 : 1;
-        p.x = (double)(rand() % 180 - 90) / 100.0;
-        p.y = platforms.empty() ? cameraY + 0.5 : platforms.back().y + 0.25 + (rand() % 50) / 300.0;
-        if(p.type == 2)
+        if(rand() % 100 < 5)
         {
-            p.speed = (rand() % 50 + 20) / 7500.0;
-            p.moveRange = (rand() % 50 + 30) / 100.0;
-            p.startX = p.x;
+            Enemy e;
+            e.x = (double)(rand() % 160 - 80) / 100.0;
+            e.y = platforms.empty() ? cameraY + 0.7 : platforms.back().y + 0.25 + (rand() % 40) / 100.0;
+            enemies.push_back(e);
         }
-        platforms.push_back(p);
+        else
+        {
+            Platform p;
+            p.type = (rand() % 5 == 0) ? 2 : 1;
+            p.x = (double)(rand() % 180 - 90) / 100.0;
+            p.y = platforms.empty() ? cameraY + 0.5 : platforms.back().y + 0.25 + (rand() % 50) / 300.0;
+            if(p.type == 2)
+            {
+                p.speed = (rand() % 50 + 20) / 7500.0;
+                p.moveRange = (rand() % 50 + 30) / 100.0;
+                p.startX = p.x;
+            }
+            platforms.push_back(p);
+        }
     }
 }
 
@@ -162,6 +209,7 @@ void display()
         glColor3d(1.0, 1.0, 1.0);
         drawPlayer();
         drawPlatforms();
+        drawEnemies();
     }
     glutSwapBuffers();
 }
@@ -184,6 +232,21 @@ void update(int value)
                 p.speed *= -1;
             }
         }
+    }
+
+    for(auto& e : enemies) {
+        if(!e.alive) continue;
+
+        bool topCollision = checkEnemyCollision(playerX, playerY, e);
+    
+        bool generalCollision = (playerX + 0.05 > e.x - e.width/2 && playerX - 0.05 < e.x + e.width/2 && playerY + 0.05 > e.y - e.height/2 && playerY - 0.05 < e.y + e.height/2);
+
+        if(topCollision) 
+        {
+            e.alive = false;
+            velocity = jumpForce;
+        }
+        else if(generalCollision) gameOver = true;
     }
 
     velocity += gravity;
@@ -224,6 +287,7 @@ void restartGame()
     velocity = 0.0;
     cameraY = -0.5;
     platforms.clear();
+    enemies.clear();
     generatePlatforms();
 
     glMatrixMode(GL_PROJECTION);
@@ -271,3 +335,4 @@ int main(int argc, char** argv)
     glutMainLoop();
     return 0;
 }
+
