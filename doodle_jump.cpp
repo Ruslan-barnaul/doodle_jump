@@ -13,6 +13,7 @@ const double jumpForce = 0.05;
 const double maxJumpHeight = 0.3;
 const double deathThreshold = 2.0;
 const double MaxFallSpeed = -0.15;
+const double bulletSpeed = 0.12;
 bool gameOver = false;
 
 struct Platform
@@ -26,6 +27,14 @@ struct Platform
     double startX;
 };
 
+struct Bullet
+{
+    double x, y;
+    double speed;
+    double speedX, speedY;
+    bool active;
+};
+
 struct Enemy
 {
     double x, y;
@@ -35,6 +44,7 @@ struct Enemy
 };
 
 std::vector<Platform> platforms;
+std::vector<Bullet> bullets;
 std::vector<Enemy> enemies;
 
 void generatePlatforms()
@@ -109,6 +119,18 @@ void drawEnemies()
                 glVertex2d(e.x - e.width/2, e.y + e.height/2);
             glEnd();
         }
+    }
+}
+
+void drawBullets()
+{
+    glColor3d(1.0, 1.0, 0.0);
+    for(const auto& b : bullets) 
+    {
+        glPushMatrix();
+        glTranslated(b.x, b.y, 0);
+        glutSolidSphere(0.03, 10, 10);
+        glPopMatrix();
     }
 }
 
@@ -210,6 +232,7 @@ void display()
         drawPlayer();
         drawPlatforms();
         drawEnemies();
+        drawBullets();
     }
     glutSwapBuffers();
 }
@@ -234,8 +257,27 @@ void update(int value)
         }
     }
 
+    for(auto& b : bullets)
+    {
+        b.x += b.speedX;
+        b.y += b.speedY;
+
+        if(b.y > cameraY + 2.0 || b.y < cameraY - 2.0) b.active = false;
+    }
+
+    bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& b) { return !b.active; }), bullets.end());
+
     for(auto& e : enemies) {
         if(!e.alive) continue;
+        
+        for(auto& b : bullets) 
+        {
+            if(b.x > e.x - e.width/2 && b.x < e.x + e.width/2 && b.y > e.y - e.height/2 && b.y < e.y + e.height/2) 
+            {
+                e.alive = false;
+                b.active = false;
+            }
+        }
 
         bool topCollision = checkEnemyCollision(playerX, playerY, e);
     
@@ -288,6 +330,7 @@ void restartGame()
     cameraY = -0.5;
     platforms.clear();
     enemies.clear();
+    bullets.clear();
     generatePlatforms();
 
     glMatrixMode(GL_PROJECTION);
@@ -318,6 +361,38 @@ void keyboard(unsigned char key, int x, int y)
     }
 }
 
+void mouse(int button, int state, int x, int y)
+{
+    if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && !gameOver) 
+    {
+        GLint viewport[4];
+        GLdouble modelview[16], projection[16];
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+        glGetDoublev(GL_PROJECTION_MATRIX, projection);
+        
+        GLdouble wx, wy, wz;
+        gluUnProject(x, viewport[3] - y, 0, modelview, projection, viewport, &wx, &wy, &wz);
+        
+        Bullet b;
+        b.x = playerX;
+        b.y = playerY;
+        b.active = true;
+        double dx = wx - playerX;
+        double dy = wy - playerY;
+        double length = sqrt(dx * dx + dy * dy);
+        if(length > 0) 
+        {
+            dx /= length;
+            dy /= length;
+        }
+
+        b.speedX = dx * bulletSpeed;
+        b.speedY = dy * bulletSpeed;
+        bullets.push_back(b);
+    }
+}
+
 int main(int argc, char** argv)
 {
     glutInit(&argc, argv);
@@ -330,9 +405,9 @@ int main(int argc, char** argv)
 
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
+    glutMouseFunc(mouse);
     glutTimerFunc(0, update, 0);
 
     glutMainLoop();
     return 0;
 }
-
